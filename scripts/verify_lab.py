@@ -103,6 +103,81 @@ def verify_phase_1_6():
 
     return True
 
+def verify_phase_1_7():
+    print("\nPhase 1.7 Security Monitoring Dashboard Verification...")
+    
+    # 1. Container Running
+    result = subprocess.run(["docker", "ps", "--format", "{{.Names}}"], capture_output=True, text=True)
+    if "adaptx-monitoring" in result.stdout:
+        print("[PASS] Monitoring Dashboard Container")
+    else:
+        print("[FAIL] Monitoring Dashboard Container not running")
+        return False
+        
+    # 2. Container IP
+    result = subprocess.run(["docker", "inspect", "-f", "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}", "adaptx-monitoring"], capture_output=True, text=True)
+    if "10.10.10.100" in result.stdout:
+        print("[PASS] Monitoring Dashboard IP (10.10.10.100)")
+    else:
+        print("[FAIL] Monitoring Dashboard IP incorrect: " + result.stdout.strip())
+        return False
+        
+    # 3. Health API
+    cmd = f"docker run --rm --network {NETWORK_NAME} curlimages/curl -s -f http://10.10.10.100:3000/api/health"
+    if run_cmd(cmd):
+        print("[PASS] Monitoring Dashboard Health API")
+        print("[PASS] Database Connectivity (via Health API)")
+    else:
+        print("[FAIL] Monitoring Dashboard Health API")
+        return False
+
+    # 4. Endpoints Check
+    endpoints = [
+        "/api/alerts",
+        "/api/statistics/overview",
+        "/api/statistics/severity",
+        "/api/statistics/types",
+        "/api/statistics/sources",
+        "/api/telemetry"
+    ]
+    
+    all_apis_passed = True
+    for ep in endpoints:
+        cmd = f"docker run --rm --network {NETWORK_NAME} curlimages/curl -s -f http://10.10.10.100:3000{ep}"
+        if run_cmd(cmd) is not None:
+            print(f"[PASS] {ep} API")
+        else:
+            print(f"[FAIL] {ep} API")
+            all_apis_passed = False
+            
+    if not all_apis_passed:
+        return False
+
+    # Check alert detail API
+    cmd = f"docker run --rm --network {NETWORK_NAME} curlimages/curl -s http://10.10.10.100:3000/api/alerts?limit=1"
+    output = run_cmd(cmd)
+    if output:
+        try:
+            data = json.loads(output)
+            if "data" in data and len(data["data"]) > 0:
+                alert_id = data["data"][0]["alert_id"]
+                cmd2 = f"docker run --rm --network {NETWORK_NAME} curlimages/curl -s -f http://10.10.10.100:3000/api/alerts/{alert_id}"
+                if run_cmd(cmd2):
+                    print("[PASS] Alert Detail API")
+                    cmd3 = f"docker run --rm --network {NETWORK_NAME} curlimages/curl -s -f http://10.10.10.100:3000/api/alerts/{alert_id}/timeline"
+                    if run_cmd(cmd3):
+                        print("[PASS] Alert Timeline API")
+                    else:
+                        print("[FAIL] Alert Timeline API")
+                        return False
+                else:
+                    print("[FAIL] Alert Detail API")
+                    return False
+        except (json.JSONDecodeError, KeyError):
+            pass
+
+    return True
+
 def main():
     print("Starting ADAPT-X Lab Verification...\n")
     all_passed = True
@@ -265,6 +340,9 @@ def main():
         all_passed = False
 
     if not verify_phase_1_6():
+        all_passed = False
+
+    if not verify_phase_1_7():
         all_passed = False
 
     print("\nVerification Complete.")
