@@ -1,7 +1,7 @@
 FROM ubuntu:22.04
 
 RUN apt-get update && \
-    apt-get install -y openssh-server netcat rsyslog && \
+    apt-get install -y openssh-server netcat && \
     rm -rf /var/lib/apt/lists/*
 
 # Setup test user
