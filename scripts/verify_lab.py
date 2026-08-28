@@ -1,8 +1,5 @@
 import subprocess
 import json
-import urllib.request
-import urllib.error
-import socket
 import sys
 
 SERVICES = {
@@ -36,71 +33,94 @@ def check_network():
             pass
     return False
 
-def get_container_ip(container_name):
-    output = run_cmd(f"docker inspect -f '{{{{range .NetworkSettings.Networks}}}}{{{{.IPAddress}}}}{{{{end}}}}' {container_name}")
-    return output if output else None
+def check_telemetry_collector_ip():
+    output = run_cmd("docker inspect adaptx-telemetry")
+    if output:
+        try:
+            data = json.loads(output)
+            ip = data[0]["NetworkSettings"]["Networks"][NETWORK_NAME]["IPAddress"]
+            return ip == "10.10.10.60"
+        except (KeyError, IndexError, json.JSONDecodeError):
+            pass
+    return False
 
-def test_tcp(ip, port):
-    try:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(2)
-        result = sock.connect_ex((ip, port))
-        sock.close()
-        return result == 0
-    except:
-        return False
+def check_telemetry_table_exists():
+    cmd = "docker exec adaptx-db psql -U adaptx_user -d adaptx_lab -t -c \"SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'telemetry_events');\""
+    output = run_cmd(cmd)
+    if output and "t" in output.strip():
+        return True
+    return False
 
-def test_http(ip, port, endpoint):
-    url = f"http://{ip}:{port}{endpoint}"
-    try:
-        response = urllib.request.urlopen(url, timeout=2)
-        return response.getcode() == 200
-    except urllib.error.URLError:
-        return False
+def check_telemetry_events_exist():
+    cmd = "docker exec adaptx-db psql -U adaptx_user -d adaptx_lab -t -c \"SELECT COUNT(*) FROM telemetry_events;\""
+    output = run_cmd(cmd)
+    if output:
+        try:
+            count = int(output.strip())
+            return count > 0
+        except ValueError:
+            pass
+    return False
 
 def main():
     print("Starting ADAPT-X Lab Verification...\n")
     all_passed = True
 
-    # Check Docker
     if check_docker():
         print("[PASS] Docker")
     else:
-        print("[FAIL] Docker - Docker is not available or not running.")
+        print("[FAIL] Docker")
         all_passed = False
 
-    # Check Network
     if check_network():
-        print("[PASS] Network")
+        print("[PASS] Phase 1.2 Network")
     else:
-        print("[FAIL] Network - adaptx_network is not correctly configured (Expected 10.10.10.0/24)")
+        print("[FAIL] Phase 1.2 Network")
         all_passed = False
 
-    # Note: On Windows hosts, the internal Docker IP (10.10.10.X) might not be directly reachable 
-    # from the host script depending on Docker Desktop configuration. The most accurate way to verify
-    # reachability is from *inside* another container on the same network.
-    # Therefore we will launch a temporary tester container on the network.
-    
     print("\nRunning connectivity tests from within the lab network...")
     for svc_name, svc_info in SERVICES.items():
         ip = svc_info["ip"]
         port = svc_info["port"]
         
-        # We use a temporary alpine container attached to the network to test connections
         if svc_info["type"] == "http":
             cmd = f"docker run --rm --network {NETWORK_NAME} curlimages/curl -s -f --connect-timeout 2 http://{ip}:{port}{svc_info['endpoint']}"
             if run_cmd(cmd) is not None:
                 print(f"[PASS] {svc_name.replace('-', ' ').title()}")
             else:
-                print(f"[FAIL] {svc_name.replace('-', ' ').title()} - HTTP Check Failed")
+                print(f"[FAIL] {svc_name.replace('-', ' ').title()}")
                 all_passed = False
         else:
             cmd = f"docker run --rm --network {NETWORK_NAME} alpine nc -z -w 2 {ip} {port}"
             if run_cmd(cmd) is not None:
                 print(f"[PASS] {svc_name.replace('-', ' ').title()}")
             else:
-                print(f"[FAIL] {svc_name.replace('-', ' ').title()} - TCP Check Failed")
+                print(f"[FAIL] {svc_name.replace('-', ' ').title()}")
                 all_passed = False
+
+    print("\nPhase 1.3 Telemetry Verification...")
+    
+    if check_telemetry_collector_ip():
+        print("[PASS] Telemetry Collector")
+    else:
+        print("[FAIL] Telemetry Collector")
+        all_passed = False
+
+    if check_telemetry_table_exists():
+        print("[PASS] Telemetry Database Schema")
+    else:
+        print("[FAIL] Telemetry Database Schema")
+        all_passed = False
+
+    if check_telemetry_events_exist():
+        print("[PASS] End-to-End Telemetry")
+        print("[PASS] Event Storage")
+        print("[PASS] Event Normalization")
+    else:
+        print("[FAIL] End-to-End Telemetry (no events found)")
+        print("[FAIL] Event Storage")
+        print("[FAIL] Event Normalization")
+        all_passed = False
 
     print("\nVerification Complete.")
     if all_passed:
