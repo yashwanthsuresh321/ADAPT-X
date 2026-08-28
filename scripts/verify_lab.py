@@ -122,6 +122,57 @@ def main():
         print("[FAIL] Event Normalization")
         all_passed = False
 
+    print("\nPhase 1.4 Feature Engineering Verification...")
+    
+    def check_feature_ip():
+        output = run_cmd("docker inspect adaptx-feature-engineering")
+        if output:
+            try:
+                data = json.loads(output)
+                ip = data[0]["NetworkSettings"]["Networks"][NETWORK_NAME]["IPAddress"]
+                return ip == "10.10.10.70"
+            except (KeyError, IndexError, json.JSONDecodeError):
+                pass
+        return False
+
+    def check_feature_table_exists():
+        cmd = "docker exec adaptx-db psql -U adaptx_user -d adaptx_lab -t -c \"SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'behavioral_features');\""
+        output = run_cmd(cmd)
+        if output and "t" in output.strip():
+            return True
+        return False
+
+    def check_feature_records_exist():
+        cmd = "docker exec adaptx-db psql -U adaptx_user -d adaptx_lab -t -c \"SELECT COUNT(*) FROM behavioral_features;\""
+        output = run_cmd(cmd)
+        if output:
+            try:
+                count = int(output.strip())
+                return count > 0
+            except ValueError:
+                pass
+        return False
+
+    if check_feature_ip():
+        print("[PASS] Feature Engineering Container")
+        print("[PASS] Feature Engineering IP (10.10.10.70)")
+    else:
+        print("[FAIL] Feature Engineering Container or IP")
+        all_passed = False
+
+    if check_feature_table_exists():
+        print("[PASS] Behavioral Features Table Schema")
+    else:
+        print("[FAIL] Behavioral Features Table Schema")
+        all_passed = False
+
+    if check_feature_records_exist():
+        print("[PASS] Feature Generation (Data Exists)")
+        print("[PASS] Pipeline E2E")
+    else:
+        print("[FAIL] Feature Generation (No Data)")
+        all_passed = False
+
     print("\nVerification Complete.")
     if all_passed:
         print("ADAPT-X LAB STATUS: READY")

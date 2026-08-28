@@ -81,6 +81,18 @@ services:
     depends_on:
       - database
 
+  feature-engineering:
+    build: ./feature-engineering
+    container_name: adaptx-feature-engineering
+    env_file:
+      - ../.env
+    networks:
+      adaptx_network:
+        ipv4_address: 10.10.10.70
+    restart: unless-stopped
+    depends_on:
+      - database
+
 networks:
   adaptx_network:
     name: adaptx_network
