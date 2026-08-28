@@ -1,0 +1,78 @@
+services:
+  web-server:
+    build: ./web-server
+    container_name: adaptx-web
+    networks:
+      adaptx_network:
+        ipv4_address: 10.10.10.10
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  ssh-server:
+    build: ./ssh-server
+    container_name: adaptx-ssh
+    networks:
+      adaptx_network:
+        ipv4_address: 10.10.10.20
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "22"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  database:
+    image: postgres:15
+    container_name: adaptx-db
+    env_file:
+      - ../.env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d
+    networks:
+      adaptx_network:
+        ipv4_address: 10.10.10.30
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  internal-server:
+    build: ./internal-server
+    container_name: adaptx-internal
+    networks:
+      adaptx_network:
+        ipv4_address: 10.10.10.40
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  cowrie:
+    image: cowrie/cowrie:latest
+    container_name: adaptx-cowrie
+    volumes:
+      - ./honeypot/logs:/cowrie/cowrie-git/var/log/cowrie
+    networks:
+      adaptx_network:
+        ipv4_address: 10.10.10.50
+    restart: unless-stopped
+
+networks:
+  adaptx_network:
+    name: adaptx_network
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.10.10.0/24
+
+volumes:
+  postgres_data:
