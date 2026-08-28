@@ -4,6 +4,13 @@
 
 ADAPT-X is a cybersecurity platform designed to detect, understand, predict, and respond to attacker behavior using adaptive cyber deception. The long-term system will transform cyber deception from a static monitoring mechanism into an adaptive AI-assisted defensive mechanism.
 
+- [x] **Phase 1.2:** Initial Cyber Lab Infrastructure
+- [x] **Phase 1.3:** Telemetry Collection & Event Normalization
+- [x] **Phase 1.4:** Behavioral Feature Engineering
+- [x] **Phase 1.5:** AI/ML Behavioral Detection
+- [x] **Phase 1.6:** Detection & Alerting Engine
+- [ ] **Phase 1.7:** Web Dashboard & Visualizations
+
 ## Phase 1.2 — Initial Cyber Lab Infrastructure
 
 This phase establishes the foundational Docker-based cyber lab with isolated networking and distinct target services. It deliberately excludes AI, advanced prediction, and adaptive deception features, providing a clean baseline for telemetry collection in later phases.

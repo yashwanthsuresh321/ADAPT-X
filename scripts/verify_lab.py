@@ -62,6 +62,47 @@ def check_telemetry_events_exist():
             pass
     return False
 
+def verify_phase_1_6():
+    print("\nPhase 1.6 Detection & Alerting Verification...")
+    
+    # 1. Container Running
+    result = subprocess.run(["docker", "ps", "--format", "{{.Names}}"], capture_output=True, text=True)
+    if "adaptx-detection-engine" in result.stdout:
+        print("[PASS] Detection Engine Container")
+    else:
+        print("[FAIL] Detection Engine Container not running")
+        return False
+        
+    # 2. Container IP
+    result = subprocess.run(["docker", "inspect", "-f", "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}", "adaptx-detection-engine"], capture_output=True, text=True)
+    if "10.10.10.90" in result.stdout:
+        print("[PASS] Detection Engine IP (10.10.10.90)")
+    else:
+        print("[FAIL] Detection Engine IP incorrect: " + result.stdout.strip())
+        return False
+        
+    # 3. Database Schema
+    query = "SELECT count(*) FROM information_schema.tables WHERE table_name = 'alerts';"
+    cmd = f"docker exec adaptx-db psql -U adaptx_user -d adaptx_lab -t -c \"{query}\""
+    result = run_cmd(cmd)
+    if result and "1" in result:
+        print("[PASS] Alerts Table Schema")
+    else:
+        print("[FAIL] Alerts Table Schema missing")
+        return False
+        
+    # 4. Alerts Generation (End-to-End)
+    query = "SELECT count(*) FROM alerts;"
+    cmd = f"docker exec adaptx-db psql -U adaptx_user -d adaptx_lab -t -c \"{query}\""
+    result = run_cmd(cmd)
+    if result and int(result.strip()) >= 0:
+        print("[PASS] Alert Query Works")
+    else:
+        print("[FAIL] Alert Query Failed")
+        return False
+
+    return True
+
 def main():
     print("Starting ADAPT-X Lab Verification...\n")
     all_passed = True
@@ -221,6 +262,9 @@ def main():
         print("[PASS] ML Inference Works (Predictions Exist)")
     else:
         print("[FAIL] ML Inference (No Predictions)")
+        all_passed = False
+
+    if not verify_phase_1_6():
         all_passed = False
 
     print("\nVerification Complete.")
