@@ -8,6 +8,22 @@ ADAPT-X is a cybersecurity platform designed to detect, understand, predict, and
 
 This phase establishes the foundational Docker-based cyber lab with isolated networking and distinct target services. It deliberately excludes AI, advanced prediction, and adaptive deception features, providing a clean baseline for telemetry collection in later phases.
 
+### Phase 1.3: Telemetry Collection (Closed)
+- Deployed Telemetry Collector (`10.10.10.60`)
+- Implemented robust `telemetry_events` PostgreSQL storage
+- Ensured idempotency against duplicate logs
+
+### Phase 1.4: Behavioral Feature Engineering (Closed)
+- Deployed Feature Engineering service (`10.10.10.70`)
+- Transformed raw telemetry into structured JSONB behavior sequences
+- Populated `behavioral_features` table
+
+### Phase 1.5: AI/ML Behavioral Baseline (Closed)
+- Deployed ML Engine container (`10.10.10.80`)
+- Generated synthetic laboratory ground truth in `ml_scenarios`
+- Built Scikit-Learn `RandomForestClassifier` pipeline
+- Established end-to-end inference stored in `ml_predictions`
+
 ### Architecture
 
 The lab consists of five distinct services:

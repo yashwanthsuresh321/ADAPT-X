@@ -93,6 +93,21 @@ services:
     depends_on:
       - database
 
+  ml-engine:
+    build: ./ml-engine
+    container_name: adaptx-ml-engine
+    env_file:
+      - ../.env
+    networks:
+      adaptx_network:
+        ipv4_address: 10.10.10.80
+    restart: unless-stopped
+    command: tail -f /dev/null
+    volumes:
+      - ./ml-engine:/app
+    depends_on:
+      - database
+
 networks:
   adaptx_network:
     name: adaptx_network

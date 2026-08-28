@@ -173,6 +173,56 @@ def main():
         print("[FAIL] Feature Generation (No Data)")
         all_passed = False
 
+    print("\nPhase 1.5 ML Engine Verification...")
+    
+    def check_ml_ip():
+        output = run_cmd("docker inspect adaptx-ml-engine")
+        if output:
+            try:
+                data = json.loads(output)
+                ip = data[0]["NetworkSettings"]["Networks"][NETWORK_NAME]["IPAddress"]
+                return ip == "10.10.10.80"
+            except (KeyError, IndexError, json.JSONDecodeError):
+                pass
+        return False
+
+    def check_ml_table_exists(table_name):
+        cmd = f"docker exec adaptx-db psql -U adaptx_user -d adaptx_lab -t -c \"SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = '{table_name}');\""
+        output = run_cmd(cmd)
+        if output and "t" in output.strip():
+            return True
+        return False
+
+    def check_ml_records_exist(table_name):
+        cmd = f"docker exec adaptx-db psql -U adaptx_user -d adaptx_lab -t -c \"SELECT COUNT(*) FROM {table_name};\""
+        output = run_cmd(cmd)
+        if output:
+            try:
+                count = int(output.strip())
+                return count > 0
+            except ValueError:
+                pass
+        return False
+
+    if check_ml_ip():
+        print("[PASS] ML Engine Container")
+        print("[PASS] ML Engine IP (10.10.10.80)")
+    else:
+        print("[FAIL] ML Engine Container or IP")
+        all_passed = False
+
+    if check_ml_table_exists("ml_scenarios") and check_ml_table_exists("ml_predictions"):
+        print("[PASS] ML Tables Schema (ml_scenarios, ml_predictions)")
+    else:
+        print("[FAIL] ML Tables Schema")
+        all_passed = False
+        
+    if check_ml_records_exist("ml_predictions"):
+        print("[PASS] ML Inference Works (Predictions Exist)")
+    else:
+        print("[FAIL] ML Inference (No Predictions)")
+        all_passed = False
+
     print("\nVerification Complete.")
     if all_passed:
         print("ADAPT-X LAB STATUS: READY")
