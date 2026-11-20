@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import Link from "next/link";
-import { ArrowLeft, ShieldAlert, CheckCircle2, AlertTriangle, Info, Clock, Check, Shield, Server, Network, Activity } from "lucide-react";
+import { ArrowLeft, ShieldAlert, CheckCircle2, AlertTriangle, Info, Clock, Check, Shield, Server, Network, Activity, ListOrdered, Layers } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function AlertInvestigation({ params }: { params: Promise<{ id: string }> }) {
@@ -108,6 +108,73 @@ export default function AlertInvestigation({ params }: { params: Promise<{ id: s
             )}
           </div>
         ))}
+      </div>
+    );
+  };
+
+  const renderFeatureSnapshot = (snapshot: any) => {
+    if (!snapshot || typeof snapshot !== 'object' || Object.keys(snapshot).length === 0) {
+      return <div className="text-slate-500 text-sm py-2">No behavioral feature snapshot available for this alert.</div>;
+    }
+
+    const formatValue = (val: any): string => {
+      if (val === null || val === undefined) return 'N/A';
+      if (typeof val === 'number') {
+        return Number.isInteger(val) ? val.toLocaleString() : val.toFixed(2);
+      }
+      if (typeof val === 'boolean') return val ? 'True' : 'False';
+      if (typeof val === 'object') return JSON.stringify(val);
+      return String(val);
+    };
+
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+        {Object.entries(snapshot).map(([key, val]) => (
+          <div key={key} className="bg-slate-950/60 border border-slate-800 rounded-md p-3">
+            <div className="text-xs text-slate-500 uppercase font-semibold tracking-wider">
+              {key.replace(/_/g, ' ')}
+            </div>
+            <div className="text-lg font-mono font-medium text-slate-200 mt-1">
+              {formatValue(val)}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const renderBehaviorSequence = (sequence: any) => {
+    if (!sequence || (Array.isArray(sequence) && sequence.length === 0)) {
+      return <div className="text-slate-500 text-sm py-2">No behavior sequence recorded for this alert.</div>;
+    }
+
+    const items = Array.isArray(sequence) ? sequence : [sequence];
+
+    return (
+      <div className="space-y-3">
+        <div className="flex flex-wrap gap-2 max-h-72 overflow-y-auto pr-2 border border-slate-800/80 rounded-md p-3 bg-slate-950/40">
+          {items.map((item: any, idx: number) => {
+            const text = typeof item === 'string' ? item : JSON.stringify(item);
+            const dotIndex = text.indexOf('.');
+            const service = dotIndex !== -1 ? text.substring(0, dotIndex) : null;
+            const action = dotIndex !== -1 ? text.substring(dotIndex + 1) : text;
+
+            return (
+              <div 
+                key={idx} 
+                className="flex items-center text-xs font-mono bg-slate-900 border border-slate-800 rounded px-2.5 py-1 text-slate-300 hover:border-slate-700 transition-colors"
+                title={`Step ${idx + 1}: ${text}`}
+              >
+                <span className="text-slate-500 mr-1.5 font-sans font-semibold">#{idx + 1}</span>
+                {service && <span className="text-blue-400 mr-1">{service}.</span>}
+                <span className="text-slate-200">{action}</span>
+              </div>
+            );
+          })}
+        </div>
+        <div className="text-xs text-slate-500">
+          Recorded sequence length: <span className="font-mono text-slate-400">{items.length} steps</span>
+        </div>
       </div>
     );
   };
@@ -220,10 +287,37 @@ export default function AlertInvestigation({ params }: { params: Promise<{ id: s
 
           <Card className="bg-slate-900 border-slate-800">
             <CardHeader className="border-b border-slate-800 pb-4">
-              <CardTitle className="text-lg">Behavioral Evidence</CardTitle>
+              <CardTitle className="text-lg flex items-center">
+                <Layers className="h-5 w-5 mr-2 text-purple-400" />
+                Behavioral Evidence
+              </CardTitle>
             </CardHeader>
             <CardContent className="pt-6">
               {renderEvidence(alert.evidence)}
+            </CardContent>
+          </Card>
+
+          <Card className="bg-slate-900 border-slate-800">
+            <CardHeader className="border-b border-slate-800 pb-4">
+              <CardTitle className="text-lg flex items-center">
+                <Activity className="h-5 w-5 mr-2 text-emerald-400" />
+                Feature Snapshot
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6">
+              {renderFeatureSnapshot(alert.feature_snapshot)}
+            </CardContent>
+          </Card>
+
+          <Card className="bg-slate-900 border-slate-800">
+            <CardHeader className="border-b border-slate-800 pb-4">
+              <CardTitle className="text-lg flex items-center">
+                <ListOrdered className="h-5 w-5 mr-2 text-indigo-400" />
+                Behavior Sequence
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6">
+              {renderBehaviorSequence(alert.behavior_sequence)}
             </CardContent>
           </Card>
           

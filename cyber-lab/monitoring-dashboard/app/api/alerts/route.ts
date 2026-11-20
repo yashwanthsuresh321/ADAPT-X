@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { parsePaginationParams } from '@/lib/utils';
 
 export async function GET(request: Request) {
   try {
@@ -8,12 +9,7 @@ export async function GET(request: Request) {
     const status = searchParams.get('status');
     const type = searchParams.get('alert_type');
     const sourceIp = searchParams.get('source_ip');
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '50');
-    
-    // Max limit to prevent overloading
-    const safeLimit = Math.min(limit, 100);
-    const offset = (Math.max(page, 1) - 1) * safeLimit;
+    const { page, limit, offset } = parsePaginationParams(searchParams, 50, 100);
 
     let sql = `
       SELECT 
@@ -52,7 +48,7 @@ export async function GET(request: Request) {
     }
 
     sql += ` ORDER BY last_seen DESC LIMIT $${paramIndex++} OFFSET $${paramIndex++}`;
-    params.push(safeLimit, offset);
+    params.push(limit, offset);
 
     const res = await query(sql, params);
     
@@ -77,8 +73,8 @@ export async function GET(request: Request) {
       meta: {
         total,
         page,
-        limit: safeLimit,
-        pages: Math.ceil(total / safeLimit)
+        limit,
+        pages: Math.ceil(total / limit)
       }
     }, { status: 200 });
 

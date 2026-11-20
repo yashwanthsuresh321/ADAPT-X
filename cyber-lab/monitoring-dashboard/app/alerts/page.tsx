@@ -1,38 +1,59 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { formatDistanceToNow, format } from "date-fns";
 import Link from "next/link";
-import { AlertTriangle, ChevronRight, ShieldAlert, AlertCircle, Info, RefreshCw } from "lucide-react";
+import { AlertTriangle, ChevronRight, ShieldAlert, AlertCircle, Info, RefreshCw, Search } from "lucide-react";
 
 export default function AlertQueue() {
   const [alerts, setAlerts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [meta, setMeta] = useState<any>(null);
   
-  // Filters
+  // Filters & Pagination
   const [severity, setSeverity] = useState("");
   const [status, setStatus] = useState("NEW");
+  const [search, setSearch] = useState("");
+  const [submittedSearch, setSubmittedSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const limit = 25;
 
-  const fetchAlerts = async () => {
+  const fetchAlerts = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
       if (severity) params.append("severity", severity);
       if (status) params.append("status", status);
+      if (submittedSearch) params.append("search", submittedSearch);
+      params.append("page", page.toString());
+      params.append("limit", limit.toString());
       
       const res = await fetch(`/api/alerts?${params.toString()}`);
       const data = await res.json();
       setAlerts(data.data || []);
+      setMeta(data.meta || null);
     } catch (error) {
       console.error("Failed to fetch alerts", error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [severity, status, submittedSearch, page]);
 
   useEffect(() => {
     fetchAlerts();
-  }, [severity, status]);
+  }, [fetchAlerts]);
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPage(1);
+    setSubmittedSearch(search.trim());
+  };
+
+  const handleClearSearch = () => {
+    setSearch("");
+    setSubmittedSearch("");
+    setPage(1);
+  };
 
   const getSeverityIcon = (sev: string) => {
     switch (sev) {
@@ -60,12 +81,39 @@ export default function AlertQueue() {
           <h2 className="text-2xl font-bold tracking-tight">Alert Queue</h2>
           <p className="text-sm text-slate-400">Manage and investigate security detections</p>
         </div>
-        
+      </div>
+
+      <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4 bg-slate-900 p-4 rounded-lg border border-slate-800">
+        <form onSubmit={handleSearchSubmit} className="flex-1 flex">
+          <div className="relative w-full max-w-md">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+            <input 
+              type="text" 
+              placeholder="Search IP, title, session, alert type..." 
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9 w-full bg-slate-950 border border-slate-800 rounded-md px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+          <button type="submit" className="ml-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-sm font-medium rounded-md transition-colors">
+            Search
+          </button>
+          {submittedSearch && (
+            <button 
+              type="button" 
+              onClick={handleClearSearch}
+              className="ml-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-sm text-slate-300 rounded-md transition-colors"
+            >
+              Clear
+            </button>
+          )}
+        </form>
+
         <div className="flex items-center space-x-4">
           <select 
             value={severity} 
-            onChange={e => setSeverity(e.target.value)}
-            className="bg-slate-900 border border-slate-800 rounded-md px-3 py-2 text-sm text-slate-200"
+            onChange={e => { setSeverity(e.target.value); setPage(1); }}
+            className="bg-slate-950 border border-slate-800 rounded-md px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
           >
             <option value="">All Severities</option>
             <option value="CRITICAL">Critical</option>
@@ -76,8 +124,8 @@ export default function AlertQueue() {
 
           <select 
             value={status} 
-            onChange={e => setStatus(e.target.value)}
-            className="bg-slate-900 border border-slate-800 rounded-md px-3 py-2 text-sm text-slate-200"
+            onChange={e => { setStatus(e.target.value); setPage(1); }}
+            className="bg-slate-950 border border-slate-800 rounded-md px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
           >
             <option value="">All Statuses</option>
             <option value="NEW">New</option>
@@ -162,6 +210,31 @@ export default function AlertQueue() {
             )}
           </tbody>
         </table>
+
+        {/* Pagination */}
+        {meta && (
+          <div className="flex items-center justify-between px-4 py-3 bg-slate-950 border-t border-slate-800">
+            <div className="text-sm text-slate-400 font-mono">
+              Page {meta.page} of {Math.max(1, meta.pages)} <span className="mx-2">|</span> {meta.total} total alerts
+            </div>
+            <div className="flex space-x-2">
+              <button 
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                className="px-3 py-1 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-sm rounded transition-colors"
+              >
+                Previous
+              </button>
+              <button 
+                onClick={() => setPage(p => Math.min(meta.pages || 1, p + 1))}
+                disabled={page >= (meta.pages || 1)}
+                className="px-3 py-1 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-sm rounded transition-colors"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
